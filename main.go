@@ -9,18 +9,29 @@ import (
 	"time"
 
 	"./handlers"
+	"github.com/gorilla/mux"
 )
 
+//----> Entery point
 func main() {
 	//references to handlers
 	l := log.New(os.Stdout, "product-api", log.LstdFlags)
 	//this is the product handler from the handlers package
 	ph := handlers.NewProducts(l)
 	//new server mux object to handle routing traffick
-	sm := http.NewServeMux()
+	//sm := http.NewServeMux()
+	sm := mux.NewRouter() //gorilla mux
 
-	sm.Handle("/products", ph) //this is the route for products that the server mux takes for product calls:w
+	getRouter := sm.Methods(http.MethodGet).Subrouter()
+	getRouter.HandleFunc("/products", ph.GetProducts)
 
+	putRouter := sm.Methods(http.MethodPut).Subrouter()
+	putRouter.Use(ph.MiddleWareProductValidation)
+	putRouter.HandleFunc("/products/{id:[0-9]+}", ph.UpdateProducts)
+
+	postRouter := sm.Methods(http.MethodPost).Subrouter()
+	postRouter.Use(ph.MiddleWareProductValidation)
+	postRouter.HandleFunc("/products", ph.PostProduct)
 	//SERVER CREATION
 	http.ListenAndServe(":8000", sm)
 	// - we can add certain parameters based on the fnctionality of the service
@@ -34,6 +45,7 @@ func main() {
 		WriteTimeout: 1 * time.Second,
 	} //we want to look at tuning, by manually creating a
 	//server
+
 	go func() { //this go routing handles things so as not to block
 		err := s.ListenAndServe()
 		if err != nil {
